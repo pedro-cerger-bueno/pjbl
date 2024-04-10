@@ -1,0 +1,58 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#include <ESP32Servo.h>
+
+const int trigPin = 9;            
+const int echoPin = 8;            
+const int Led = 2;                
+const int rfidResetPin = 22;      //pino de reset do módulo rfid
+const int rfidSspin = 21;         //pino do slave select do módulo rfid
+
+MFRC522 mfrc522(rfidSspin, rfidResetPin); //cria uma instância do leitor RFID
+Servo servo1;                     
+bool portaFechada = false;  //variável para controlar o estado da porta
+
+long duracao;                     
+float distancia;                  
+
+void setup() {
+    pinMode(Led, OUTPUT);         
+    pinMode(trigPin, OUTPUT);     
+    pinMode(echoPin, INPUT);      
+    Serial.begin(9600);          
+    servo1.attach(11);            
+    SPI.begin();                  //Inicia a comunicação SPI
+    mfrc522.PCD_Init();           //Inicia o módulo RFID
+}
+
+void loop() {
+    
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+
+    duracao = pulseIn(echoPin, HIGH);
+    distancia = duracao * 0.034 / 2;
+
+    //Verifica se um cartão RFID está presente
+    if (mfrc522.PICC_IsNewCardPresent() && portaFechada) {   //mfrc522.PICC_ReadCardSerial()
+        // Se um cartão RFID for detectado e a porta estiver fechada, abre a porta
+        servo1.write(0);         
+        digitalWrite(Led, LOW);
+        portaFechada = false;   // Marca a porta como aberta
+        mfrc522.PICC_HaltA();   // Encerra a comunicação com o cartão RFID
+    } else {
+        // Se a porta estiver aberta, verifica a distância medida pelo sensor ultrassônico
+        if (!portaFechada) {
+            // Se a porta estiver aberta, verifique a distância do sensor ultrassônico
+            if (distancia < 50) {
+                // Se a distância for menor que 50 cm, fecha a porta
+                servo1.write(180);    
+                digitalWrite(Led, HIGH);
+                portaFechada = true;  // Marca a porta como fechada
+            }
+        }
+    }
+}
